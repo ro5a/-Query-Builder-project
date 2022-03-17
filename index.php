@@ -1,94 +1,57 @@
 <?php
-interface Builder
-{
-    public function producePartA(): void;
 
-    public function producePartB(): void;
-
-    public function producePartC(): void;
-}
-class ConcreteBuilder1 implements Builder
+class QueryBuilder
 {
-    private $product;
+    private $fields = [];
+    private $conditions = [];
+    private $from = [];
     public function __construct()
     {
         $this->reset();
     }
 
-    public function reset(): void
+    public function __toString(): string
     {
-        $this->product = new Product1();
+        $where = $this->conditions === [] ? '' : ' WHERE ' . implode(' AND ', $this->conditions);
+        return 'SELECT ' . implode(', ', $this->fields)
+            . ' FROM ' . implode(', ', $this->from)
+            . $where;
     }
-    public function producePartA(): void
+    public function select(string ...$select): self
     {
-        $this->product->parts[] = "PartA1";
+        $this->fields = $select;
+        return $this;
     }
 
-    public function producePartB(): void
+    public function where(string $where): self
     {
-        $this->product->parts[] = "PartB1";
+        foreach ($where as $arg) {
+            $this->conditions[] = $arg;
+        }
+        return $this;
     }
 
-    public function producePartC(): void
-    {
-        $this->product->parts[] = "PartC1";
-    }
-    public function getProduct(): Product1
-    {
-        $result = $this->product;
-        $this->reset();
-
-        return $result;
-    }
+   
 }
-class Product1
-{
-    public $parts = [];
+$query = (new QueryBuilder())
+->select('email', 'first_name', 'last_name')
+->from('user');
 
-    public function listParts(): void
-    {
-        echo "Product parts: " . implode(', ', $this->parts) . "\n\n";
-    }
-}
-class Director
-{
-    private $builder;
-    public function setBuilder(Builder $builder): void
-    {
-        $this->builder = $builder;
-    }
-    public function buildMinimalViableProduct(): void
-    {
-        $this->builder->producePartA();
-    }
+$Statement = $pdo->prepare($query);
+$Statement->execute();
 
-    public function buildFullFeaturedProduct(): void
-    {
-        $this->builder->producePartA();
-        $this->builder->producePartB();
-        $this->builder->producePartC();
-    }
-}
-function clientCode(Director $director)
-{
-    $builder = new ConcreteBuilder1();
-    $director->setBuilder($builder);
+$users = $Statement->fetchAll(PDO::FETCH_ASSOC);
+$query = (new QueryBuilder())
+->select('u.email', 'u.first_name', 'u.last_name', 'u.active')
+->from('user', 'u')
+->where('u.email = :email', 'u.active = :bool');
 
-    echo "Standard basic product:\n";
-    $director->buildMinimalViableProduct();
-    $builder->getProduct()->listParts();
+$Statement = $pdo->prepare($query);
+$Statement->execute([
+    'email' => 'roor3hakimi@gmail.com', 
+    'bool' => 1
+    ]
+);
 
-    echo "Standard full featured product:\n";
-    $director->buildFullFeaturedProduct();
-    $builder->getProduct()->listParts();
-
-    // Remember, the Builder pattern can be used without a Director class.
-    echo "Custom product:\n";
-    $builder->producePartA();
-    $builder->producePartC();
-    $builder->getProduct()->listParts();
-}
-
-$director = new Director();
-clientCode($director);
+$user = $Statement->fetch(PDO::FETCH_ASSOC);
 ?>
